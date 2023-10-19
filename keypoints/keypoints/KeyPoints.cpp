@@ -68,9 +68,10 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             // invalid debug location so don't attempt since getting the start line will fail
             return;
         }
-        // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky.
+        // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky. Based on the assignment, seems like skipping unconditional ones makes more sense, but then we get into the somewhat counter-intuitive if vs. if-else behavior
         // also check about the branch for if vs if/else
         if (BI.isUnconditional()) {
+            // return;
             // it's some sort of immediate, unconditional jump, like a goto or the end of a block
             auto op = BI.getOperand(0);
             if (isa<BasicBlock>(op)) {
@@ -123,7 +124,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                     }
                 }
             }
-            // errs() << "Function body:\n" << F << "\n";
+            errs() << "Function body:\n" << F << "\n";
         }
         return PreservedAnalyses::all();
     };
