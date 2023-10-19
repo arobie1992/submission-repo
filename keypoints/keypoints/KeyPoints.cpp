@@ -42,12 +42,12 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         // could just skip ones that aren't valid, but that seems a bit hacky
         return -1;
     };
-    void addBranchTag(Module &M, StringRef file_name, int condition_line, BasicBlock &BB) {
+    void addBranchTag(Module &M, int condition_line, BasicBlock &BB) {
         if(!seen.insert(&BB).second) {
             // we've already seen this one and transformed it
             return;
         }
-        BranchEntry BE(counter++, file_name, condition_line, getStartLine(BB));
+        BranchEntry BE(counter++, M.getName(), condition_line, getStartLine(BB));
         printBranchEntry(BE);
         for (auto &I : BB) {
             LLVMContext &context = M.getContext();
@@ -61,35 +61,42 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             break;
         }
     };
-    void handleSwitch(StringRef file_name, SwitchInst &SI) {
+    void handleSwitch(Module &M, SwitchInst &SI) {
+        if (!SI.getDebugLoc()) {
+            // invalid debug location so don't attempt since getting the condition line will fail
+            return;
+        }
+        // errs() << SI << "\n";
+        auto condition_line = SI.getDebugLoc().getLine();
+        auto &D = *SI.getDefaultDest();
+        for (auto i = 0; i < SI.getNumSuccessors(); i++) {
+            auto &S = *SI.getSuccessor(i);
+            if (&S == &D) {
+                // skip the default block for the end
+                continue;
+            }
+            addBranchTag(M, condition_line, S);
+        }
+        addBranchTag(M, condition_line, D);
     };
-    void handleBranch(Module &M, StringRef file_name, BranchInst &BI) {
+    void handleBranch(Module &M, BranchInst &BI) {
         if (!BI.getDebugLoc()) {
-            // invalid debug location so don't attempt since getting the start line will fail
+            // invalid debug location so don't attempt since getting the condition line will fail
             return;
         }
         // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky. Based on the assignment, seems like skipping unconditional ones makes more sense, but then we get into the somewhat counter-intuitive if vs. if-else behavior
         // also check about the branch for if vs if/else
         if (BI.isUnconditional()) {
-            // return;
+            return;
             // it's some sort of immediate, unconditional jump, like a goto or the end of a block
-            auto op = BI.getOperand(0);
-            if (isa<BasicBlock>(op)) {
-                auto BB = dyn_cast<BasicBlock>(op);
-                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
-            }
+            auto op = BI.getSuccessor(0);
+            addBranchTag(M, BI.getDebugLoc().getLine(), *op);
         } else {
             // it's some sort of user-defined conditional like an if or a loop
             auto condition = BI.getSuccessor(0);
-            if (isa<BasicBlock>(condition)) {
-                auto BB = dyn_cast<BasicBlock>(condition);
-                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
-            }
+            addBranchTag(M, BI.getDebugLoc().getLine(), *condition);
             auto alternative = BI.getSuccessor(1);
-            if (isa<BasicBlock>(alternative)) {
-                auto BB = dyn_cast<BasicBlock>(alternative);
-                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
-            }
+            addBranchTag(M, BI.getDebugLoc().getLine(), *alternative);
         }
     };
     public:
@@ -103,28 +110,17 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                     // this is how to check which type instruction is
                     if (isa<SwitchInst>(I)) {
                         auto SI = dyn_cast<SwitchInst>(&I);
-                        handleSwitch(M.getName(), *SI);
+                        handleSwitch(M, *SI);
                     }
                     if (isa<BranchInst>(I)) {
-                        // errs() << "Branch: " << I << "\n";
-                        if(I.getDebugLoc()) {
-                            // errs() << "Debug is valid\n";
-                        } else {
-                            // errs() << "Debug is invalid\n";
-                        }
                         auto BI = dyn_cast<BranchInst>(&I);
-                        if(BI->getDebugLoc().isImplicitCode()) {
-                            // errs() << "Branch is implicit" << "\n";
-                        } else {
-                            // errs() << "Branch is explicit" << "\n";
-                        }
-                        handleBranch(M, M.getName(), *BI);
+                        handleBranch(M, *BI);
                     } else {
                         // errs() << "Different Instruction: " << I << "\n";
                     }
                 }
             }
-            errs() << "Function body:\n" << F << "\n";
+            // errs() << "Function body:\n" << F << "\n";
         }
         return PreservedAnalyses::all();
     };
