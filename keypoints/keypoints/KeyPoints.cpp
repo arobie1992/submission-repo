@@ -33,10 +33,13 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     std::set<BasicBlock*> seen;
     int getStartLine(BasicBlock &BB) {
         for (auto &I : BB) {
-            return I.getDebugLoc().getLine();
+            if (I.getDebugLoc()) {
+                return I.getDebugLoc().getLine();
+            }
         }
-        // this shouldn't happen, but shouldn't cause a ton of issues if it does
-        // mostly will probably just be some funky output in the dictionary
+        // this is happening for the if/else if/else on one of the unconditional branches
+        // need to check about that as well
+        // could just skip ones that aren't valid, but that seems a bit hacky
         return -1;
     };
     void addBranchTag(Module &M, StringRef file_name, int condition_line, BasicBlock &BB) {
