@@ -67,22 +67,21 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         }
         // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky.
         // also check about the branch for if vs if/else
-        auto num_ops = BI.getNumOperands();
-        if (num_ops == 1) {
+        if (BI.isUnconditional()) {
             // it's some sort of immediate, unconditional jump, like a goto or the end of a block
             auto op = BI.getOperand(0);
             if (isa<BasicBlock>(op)) {
                 auto BB = dyn_cast<BasicBlock>(op);
                 addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
             }
-        } else if (num_ops == 3) {
+        } else {
             // it's some sort of user-defined conditional like an if or a loop
-            auto condition = BI.getOperand(2);
+            auto condition = BI.getSuccessor(0);
             if (isa<BasicBlock>(condition)) {
                 auto BB = dyn_cast<BasicBlock>(condition);
                 addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
             }
-            auto alternative = BI.getOperand(1);
+            auto alternative = BI.getSuccessor(1);
             if (isa<BasicBlock>(alternative)) {
                 auto BB = dyn_cast<BasicBlock>(alternative);
                 addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
@@ -110,6 +109,11 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                             // errs() << "Debug is invalid\n";
                         }
                         auto BI = dyn_cast<BranchInst>(&I);
+                        if(BI->getDebugLoc().isImplicitCode()) {
+                            // errs() << "Branch is implicit" << "\n";
+                        } else {
+                            // errs() << "Branch is explicit" << "\n";
+                        }
                         handleBranch(M, M.getName(), *BI);
                     } else {
                         // errs() << "Different Instruction: " << I << "\n";
