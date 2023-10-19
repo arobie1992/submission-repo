@@ -4,6 +4,8 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
+#include <iostream>
+#include <fstream>
 
 using namespace llvm;
 
@@ -24,14 +26,24 @@ class BranchEntry {
     {}
 };
 
+// this is unused at the moment, but keeping it because it's helpful
 void printBranchEntry(BranchEntry &BE) {
     errs() << "br_" << BE.id << ": " << BE.file_name << ", " << BE.condition_line << ", " << BE.block_start_line << "\n";    
+}
+
+void writeBranchDictionary(std::vector<BranchEntry> &branchEntries) {
+    std::ofstream branch_dict("branch_dictionary.txt");
+    for (auto BE : branchEntries) {
+        branch_dict << "br_" << BE.id << ": " << BE.file_name.str() << ", " << BE.condition_line << ", " << BE.block_start_line << "\n";
+    }
+    branch_dict.close();
 }
 
 struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     private: 
     int counter;
     std::set<BasicBlock*> seen;
+    std::vector<BranchEntry> branchEntries;
     int getStartLine(BasicBlock &BB) {
         for (auto &I : BB) {
             if (I.getDebugLoc()) {
@@ -49,7 +61,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             return;
         }
         BranchEntry BE(counter++, M.getName(), condition_line, getStartLine(BB));
-        printBranchEntry(BE);
+        branchEntries.push_back(BE);
         for (auto &I : BB) {
             // code for print function adapted from this SO post: 
             // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
@@ -125,6 +137,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             }
             // errs() << "Function body:\n" << F << "\n";
         }
+        writeBranchDictionary(branchEntries);
         return PreservedAnalyses::all();
     };
 };
