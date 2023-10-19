@@ -61,21 +61,32 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     void handleSwitch(StringRef file_name, SwitchInst &SI) {
     };
     void handleBranch(Module &M, StringRef file_name, BranchInst &BI) {
-        auto num_ops = BI.getNumOperands();
-        // Branches that don't have 3 args seem to be user inserted branches 
-        // things like ifs and loops. Need to check about gotos.
-        if (num_ops != 3) {
+        if (!BI.getDebugLoc()) {
+            // invalid debug location so don't attempt since getting the start line will fail
             return;
         }
-        auto condition = BI.getOperand(2);
-        if (isa<BasicBlock>(condition)) {
-            auto BB = dyn_cast<BasicBlock>(condition);
-            addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
-        }
-        auto alternative = BI.getOperand(1);
-        if (isa<BasicBlock>(alternative)) {
-            auto BB = dyn_cast<BasicBlock>(alternative);
-            addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
+        // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky.
+        // also check about the branch for if vs if/else
+        auto num_ops = BI.getNumOperands();
+        if (num_ops == 1) {
+            // it's some sort of immediate, unconditional jump, like a goto or the end of a block
+            auto op = BI.getOperand(0);
+            if (isa<BasicBlock>(op)) {
+                auto BB = dyn_cast<BasicBlock>(op);
+                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
+            }
+        } else if (num_ops == 3) {
+            // it's some sort of user-defined conditional like an if or a loop
+            auto condition = BI.getOperand(2);
+            if (isa<BasicBlock>(condition)) {
+                auto BB = dyn_cast<BasicBlock>(condition);
+                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
+            }
+            auto alternative = BI.getOperand(1);
+            if (isa<BasicBlock>(alternative)) {
+                auto BB = dyn_cast<BasicBlock>(alternative);
+                addBranchTag(M, file_name,BI.getDebugLoc().getLine(), *BB);
+            }
         }
     };
     public:
@@ -83,7 +94,6 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         // errs() << "In Module: " << M.getName() << "\n";
         for (auto &F : M) {
             int counter = 0;
-            // errs() << "Function body:\n" << F << "\n";
             for (auto &B : F) {
                 // errs() << "Basic block:\n" << B << "\n";
                 for (auto &I : B) {
@@ -93,6 +103,12 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                         handleSwitch(M.getName(), *SI);
                     }
                     if (isa<BranchInst>(I)) {
+                        // errs() << "Branch: " << I << "\n";
+                        if(I.getDebugLoc()) {
+                            // errs() << "Debug is valid\n";
+                        } else {
+                            // errs() << "Debug is invalid\n";
+                        }
                         auto BI = dyn_cast<BranchInst>(&I);
                         handleBranch(M, M.getName(), *BI);
                     } else {
@@ -100,6 +116,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                     }
                 }
             }
+            // errs() << "Function body:\n" << F << "\n";
         }
         return PreservedAnalyses::all();
     };
