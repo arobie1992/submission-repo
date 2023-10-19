@@ -1,3 +1,4 @@
+// The starting skeleton for this code was from this post: https://www.cs.cornell.edu/~asampson/blog/llvm.html
 #include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -50,6 +51,8 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         BranchEntry BE(counter++, M.getName(), condition_line, getStartLine(BB));
         printBranchEntry(BE);
         for (auto &I : BB) {
+            // code for print function adapted from this SO post: 
+            // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
             LLVMContext &context = M.getContext();
             std::vector<Type *> printfArgsTypes({Type::getInt8PtrTy(context)});
             FunctionType *printfType = FunctionType::get(Type::getInt32Ty(context), printfArgsTypes, true);
@@ -57,7 +60,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             IRBuilder<> builder(&I);
             Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id) + "\n", "str");
             std::vector<Value *> argsV({str});
-            builder.CreateCall(printfFunc, argsV, "calltmp");
+            builder.CreateCall(printfFunc, argsV, "brtag");
             break;
         }
     };
