@@ -32,9 +32,9 @@ void printBranchEntry(BranchEntry &BE) {
 }
 
 void writeBranchDictionary(std::vector<BranchEntry> &branchEntries) {
-    std::ofstream branch_dict("branch_dictionary.txt");
+    std::ofstream branch_dict("branch_dictionary.txt", std::ios_base::app);
     for (auto BE : branchEntries) {
-        branch_dict << "br_" << BE.id << ": " << BE.file_name.str() << ", " << BE.condition_line << ", " << BE.block_start_line << "\n";
+        branch_dict << "br_" << BE.id << ": " << BE.file_name.str() << ", " << BE.condition_line << ", " << BE.block_start_line << std::endl;
     }
     branch_dict.close();
 }
