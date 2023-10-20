@@ -3,3 +3,4 @@ keypoints/build
 **/out.log
 **/test-exe
 **/branch_dictionary.txt
+**/branch_trace.txt
