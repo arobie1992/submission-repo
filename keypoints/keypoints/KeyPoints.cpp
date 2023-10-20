@@ -54,6 +54,29 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         // it shouldn't cause program issues, just some funky output
         return -1;
     };
+    void addFilePrint(Module &M, Instruction &I, BranchEntry &BE) {
+        // info on linking to externally defined library from: https://www.cs.cornell.edu/~asampson/blog/llvm.html
+        LLVMContext &context = M.getContext();
+        Type *stringtype(Type::getInt8PtrTy(context));
+        // hopefully this name is unique enough to not cause collisions
+        auto logFunc = M.getOrInsertFunction("csc512project_log_branch", Type::getVoidTy(context), stringtype);
+        IRBuilder<> builder(&I);
+        Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id), "str");
+        Value *arg(str);
+        builder.CreateCall(logFunc, arg, "brtag");
+    };
+    void addStdoutPrint(Module &M, Instruction &I, BranchEntry &BE) {
+        // code for print function adapted from this SO post: 
+        // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
+        LLVMContext &context = M.getContext();
+        std::vector<Type *> printfArgsTypes({Type::getInt8PtrTy(context)});
+        FunctionType *printfType = FunctionType::get(Type::getInt32Ty(context), printfArgsTypes, true);
+        auto printfFunc = M.getOrInsertFunction("printf", printfType);
+        IRBuilder<> builder(&I);
+        Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id) + "\n", "str");
+        std::vector<Value *> argsV({str});
+        builder.CreateCall(printfFunc, argsV, "brtag");
+    };
     void addBranchTag(Module &M, int condition_line, BasicBlock &BB) {
         if(!seen.insert(&BB).second) {
             // we've already seen this one and transformed it
@@ -62,18 +85,8 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         BranchEntry BE(counter++, M.getName(), condition_line, getStartLine(BB));
         branchEntries.push_back(BE);
         for (auto &I : BB) {
-            // code for print function adapted from this SO post: 
-            // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
-            // TODO switch this to fopen append and write: https://stackoverflow.com/questions/19429138/append-to-the-end-of-a-file-in-c
-            LLVMContext &context = M.getContext();
-            std::vector<Type *> printfArgsTypes({Type::getInt8PtrTy(context)});
-            FunctionType *printfType = FunctionType::get(Type::getInt32Ty(context), printfArgsTypes, true);
-            auto printfFunc = M.getOrInsertFunction("printf", printfType);
-            IRBuilder<> builder(&I);
-            Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id) + "\n", "str");
-            std::vector<Value *> argsV({str});
-            // TODO might add ID to the name
-            builder.CreateCall(printfFunc, argsV, "brtag");
+            // addStdoutPrint(M, I, BE);
+            addFilePrint(M, I, BE);
             // break after the first instruction because we only want to insert the tag at the start of the block
             break;
         }
@@ -136,6 +149,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             // errs() << "Function body:\n" << F << "\n";
         }
         writeBranchDictionary(branchEntries);
+        // TODO see if need to return none
         return PreservedAnalyses::all();
     };
 };
