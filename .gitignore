@@ -1,1 +1,5 @@
 keypoints/build
+**/callgrind-results.txt
+**/out.log
+**/test-exe
+**/branch_dictionary.txt
