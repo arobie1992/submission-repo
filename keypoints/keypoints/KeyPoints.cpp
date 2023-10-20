@@ -113,6 +113,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     };
     public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+        // TODO Add something to read last counter value from some file. If no file, then init to 0.
         // errs() << "In Module: " << M.getName() << "\n";
         for (auto &F : M) {
             int counter = 0;
