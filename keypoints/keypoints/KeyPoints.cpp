@@ -50,9 +50,8 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                 return I.getDebugLoc().getLine();
             }
         }
-        // this is happening for the if/else if/else on one of the unconditional branches
-        // need to check about that as well
-        // could just skip ones that aren't valid, but that seems a bit hacky
+        // this thankfully hasn't come up so far, but if it does, 
+        // it shouldn't cause program issues, just some funky output
         return -1;
     };
     void addBranchTag(Module &M, int condition_line, BasicBlock &BB) {
@@ -65,6 +64,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         for (auto &I : BB) {
             // code for print function adapted from this SO post: 
             // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
+            // TODO switch this to fopen append and write: https://stackoverflow.com/questions/19429138/append-to-the-end-of-a-file-in-c
             LLVMContext &context = M.getContext();
             std::vector<Type *> printfArgsTypes({Type::getInt8PtrTy(context)});
             FunctionType *printfType = FunctionType::get(Type::getInt32Ty(context), printfArgsTypes, true);
@@ -72,7 +72,9 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             IRBuilder<> builder(&I);
             Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id) + "\n", "str");
             std::vector<Value *> argsV({str});
+            // TODO might add ID to the name
             builder.CreateCall(printfFunc, argsV, "brtag");
+            // break after the first instruction because we only want to insert the tag at the start of the block
             break;
         }
     };
@@ -81,7 +83,6 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             // invalid debug location so don't attempt since getting the condition line will fail
             return;
         }
-        // errs() << SI << "\n";
         auto condition_line = SI.getDebugLoc().getLine();
         auto &D = *SI.getDefaultDest();
         for (auto i = 0; i < SI.getNumSuccessors(); i++) {
@@ -97,22 +98,18 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     void handleBranch(Module &M, BranchInst &BI) {
         if (!BI.getDebugLoc()) {
             // invalid debug location so don't attempt since getting the condition line will fail
+            // this results in the plugin essentially being a no-op if clang is run without -g
             return;
         }
-        // check with Dr. Shen to see if we need to worry about goto since thre's no good way to differentiate it from for loop jumps and it makes things look rather funky. Based on the assignment, seems like skipping unconditional ones makes more sense, but then we get into the somewhat counter-intuitive if vs. if-else behavior
-        // also check about the branch for if vs if/else
+
         if (BI.isUnconditional()) {
             return;
-            // it's some sort of immediate, unconditional jump, like a goto or the end of a block
-            auto op = BI.getSuccessor(0);
-            addBranchTag(M, BI.getDebugLoc().getLine(), *op);
-        } else {
-            // it's some sort of user-defined conditional like an if or a loop
-            auto condition = BI.getSuccessor(0);
-            addBranchTag(M, BI.getDebugLoc().getLine(), *condition);
-            auto alternative = BI.getSuccessor(1);
-            addBranchTag(M, BI.getDebugLoc().getLine(), *alternative);
         }
+
+        auto condition = BI.getSuccessor(0);
+        addBranchTag(M, BI.getDebugLoc().getLine(), *condition);
+        auto alternative = BI.getSuccessor(1);
+        addBranchTag(M, BI.getDebugLoc().getLine(), *alternative);
     };
     public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
