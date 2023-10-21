@@ -2,6 +2,7 @@ keypoints/build
 **/callgrind-results.txt
 **/out.log
 **/test-exe
-**/branch_dictionary.txt
-**/branch_trace.txt
+**/branch_dictionary.txt*
+**/branch_trace.txt*
 **/a.out
+**/tmp-*/
