@@ -9,7 +9,7 @@ INPUT_FILES=$@
 pid=$$
 tmpdir="tmp-$pid"
 
-pushd $(dirname $0)
+pushd $(dirname $0) > /dev/null
 
 mkdir "$tmpdir"
 
@@ -35,4 +35,4 @@ fi
 
 rm -rf "$tmpdir"
 
-popd
+popd > /dev/null
