@@ -25,17 +25,18 @@ class BranchEntry {
         condition_line(condition_line), 
         block_start_line(block_start_line) 
     {}
+    friend std::ostream& operator <<(std::ostream &out, BranchEntry &BE);
 };
 
-// this is unused at the moment, but keeping it because it's helpful
-void printBranchEntry(BranchEntry &BE) {
-    errs() << "br_" << BE.id << ": " << BE.file_name << ", " << BE.condition_line << ", " << BE.block_start_line << "\n";    
+std::ostream& operator << (std::ostream &out, BranchEntry &BE) {
+    out << "br_" << BE.id << ": " << BE.file_name.str() << ", " << BE.condition_line << ", " << BE.block_start_line;
+    return out;
 }
 
 void writeBranchDictionary(std::vector<BranchEntry> &branchEntries) {
     std::ofstream branch_dict("branch_dictionary.txt", std::ios_base::app);
     for (auto BE : branchEntries) {
-        branch_dict << "br_" << BE.id << ": " << BE.file_name.str() << ", " << BE.condition_line << ", " << BE.block_start_line << std::endl;
+        branch_dict << BE << std::endl;
     }
     branch_dict.close();
 }
@@ -74,7 +75,6 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         BranchEntry BE(counter++, M.getName(), condition_line, getStartLine(BB));
         branchEntries.push_back(BE);
         for (auto &I : BB) {
-            // addStdoutPrint(M, I, BE);
             addFilePrint(M, I, BE);
             // break after the first instruction because we only want to insert the tag at the start of the block
             break;
@@ -83,6 +83,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     void handleSwitch(Module &M, SwitchInst &SI) {
         if (!SI.getDebugLoc()) {
             // invalid debug location so don't attempt since getting the condition line will fail
+            // this results in the plugin essentially being a no-op if clang is run without -g
             return;
         }
         auto condition_line = SI.getDebugLoc().getLine();
@@ -132,14 +133,10 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
         counter = initCounter();
-        // TODO Add something to read last counter value from some file. If no file, then init to 0.
-        // errs() << "In Module: " << M.getName() << "\n";
         for (auto &F : M) {
             int counter = 0;
             for (auto &B : F) {
-                // errs() << "Basic block:\n" << B << "\n";
                 for (auto &I : B) {
-                    // this is how to check which type instruction is
                     if (isa<SwitchInst>(I)) {
                         auto SI = dyn_cast<SwitchInst>(&I);
                         handleSwitch(M, *SI);
@@ -147,16 +144,12 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                     if (isa<BranchInst>(I)) {
                         auto BI = dyn_cast<BranchInst>(&I);
                         handleBranch(M, *BI);
-                    } else {
-                        // errs() << "Different Instruction: " << I << "\n";
                     }
                 }
             }
-            // errs() << "Function body:\n" << F << "\n";
         }
         writeBranchDictionary(branchEntries);
         recordCounter(counter);
-        // TODO see if need to return none
         return PreservedAnalyses::all();
     };
 };
