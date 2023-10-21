@@ -65,18 +65,6 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         Value *arg(str);
         builder.CreateCall(logFunc, arg, "brtag");
     };
-    void addStdoutPrint(Module &M, Instruction &I, BranchEntry &BE) {
-        // code for print function adapted from this SO post: 
-        // https://stackoverflow.com/questions/49558395/adding-a-simple-printf-in-a-llvm-pass
-        LLVMContext &context = M.getContext();
-        std::vector<Type *> printfArgsTypes({Type::getInt8PtrTy(context)});
-        FunctionType *printfType = FunctionType::get(Type::getInt32Ty(context), printfArgsTypes, true);
-        auto printfFunc = M.getOrInsertFunction("printf", printfType);
-        IRBuilder<> builder(&I);
-        Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id) + "\n", "str");
-        std::vector<Value *> argsV({str});
-        builder.CreateCall(printfFunc, argsV, "brtag");
-    };
     void addBranchTag(Module &M, int condition_line, BasicBlock &BB) {
         if(!seen.insert(&BB).second) {
             // we've already seen this one and transformed it
@@ -126,7 +114,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     };
     public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
-        // TODO Add something to read last counter value from some file. If no file, then init to 0.
+                // TODO Add something to read last counter value from some file. If no file, then init to 0.
         // errs() << "In Module: " << M.getName() << "\n";
         for (auto &F : M) {
             int counter = 0;
