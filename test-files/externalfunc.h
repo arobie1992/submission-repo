@@ -1,0 +1,1 @@
+void ext(int a);

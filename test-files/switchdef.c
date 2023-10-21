@@ -10,6 +10,9 @@ void foo(int a) {
     case 3:
         printf("might be 2 or 3\n");
         break;
+    default:
+        printf("I'm a default\n");
+        break;
     }
     printf("finished\n");
 }
