@@ -4,5 +4,6 @@ keypoints/build
 **/test-exe
 **/branch_dictionary.txt*
 **/branch_trace.txt*
-**/a.out
+**/a.out*
 **/tmp-*/
+**/counter.log

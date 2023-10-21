@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 
 using namespace llvm;
 
@@ -112,9 +113,26 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         auto alternative = BI.getSuccessor(1);
         addBranchTag(M, BI.getDebugLoc().getLine(), *alternative);
     };
+    void recordCounter(int counter) {
+        std::ofstream f("counter.log");
+        f << counter;
+        f.close();
+    };
+    int initCounter() {
+        std::filesystem::path counter_log{ "counter.log" };
+        if (std::filesystem::exists(counter_log)) {
+            std::ifstream in("counter.log");
+            std::string content((std::istreambuf_iterator<char>(in)),(std::istreambuf_iterator<char>()));
+            auto ctr = std::stoi(content);
+            return ctr;
+        } else {
+            return 0;
+        }
+    }
     public:
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
-                // TODO Add something to read last counter value from some file. If no file, then init to 0.
+        counter = initCounter();
+        // TODO Add something to read last counter value from some file. If no file, then init to 0.
         // errs() << "In Module: " << M.getName() << "\n";
         for (auto &F : M) {
             int counter = 0;
@@ -137,6 +155,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
             // errs() << "Function body:\n" << F << "\n";
         }
         writeBranchDictionary(branchEntries);
+        recordCounter(counter);
         // TODO see if need to return none
         return PreservedAnalyses::all();
     };
