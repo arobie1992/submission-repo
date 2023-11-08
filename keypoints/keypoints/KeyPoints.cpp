@@ -114,6 +114,20 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         auto alternative = BI.getSuccessor(1);
         addBranchTag(M, BI.getDebugLoc().getLine(), *alternative);
     };
+    void handleCall(Module &M, CallInst &CI) {
+        if(!CI.isIndirectCall()) {
+            // if it's a direct call, it's not through a function pointer so we don't care
+            return;
+        }
+        auto op = CI.getCalledOperand();
+        LLVMContext &context = M.getContext();
+        auto voidptr = Type::getVoidTy(context)->getPointerTo();
+        // hopefully this name is unique enough to not cause collisions
+        auto logFunc = M.getOrInsertFunction("csc512project_log_fp", Type::getVoidTy(context), voidptr);
+        IRBuilder<> builder(&CI);
+        Value *arg(op);
+        builder.CreateCall(logFunc, arg, "fptag");
+    }
     void recordCounter(int counter) {
         std::ofstream f("counter.log");
         f << counter;
@@ -144,6 +158,10 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
                     if (isa<BranchInst>(I)) {
                         auto BI = dyn_cast<BranchInst>(&I);
                         handleBranch(M, *BI);
+                    }
+                    if (isa<CallInst>(I)) {
+                        auto CI = dyn_cast<CallInst>(&I);
+                        handleCall(M, *CI);
                     }
                 }
             }
