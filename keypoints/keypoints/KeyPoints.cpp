@@ -148,7 +148,6 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
         counter = initCounter();
         for (auto &F : M) {
-            int counter = 0;
             for (auto &B : F) {
                 for (auto &I : B) {
                     if (isa<SwitchInst>(I)) {
