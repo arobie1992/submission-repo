@@ -1,7 +1,9 @@
 # CSC 512 Project Fall 2023 part 1
 
 ## Running
-Run all analysis through the `profile.sh` script. To do this, simply pass your C soure files as you would to Clang or GCC. For example, given source files foo.c and bar.c, you can run `profile.sh foo.c bar.c`. This compiles and executes the code and prints the analysis information to stdout and appropriate files.
+First, build the plugin by running the `keypoints/buildplugin.sh` script.
+
+Next, run all analysis through the `profile.sh` script. To do this, simply pass your C soure files as you would to Clang or GCC. For example, given source files foo.c and bar.c, you can run `profile.sh foo.c bar.c`. This compiles and executes the code and prints the analysis information to stdout and appropriate files.
 
 ## Requirements
 This is intended to be run on the VCL Ubuntu 22.04 VMs and must have clang-17 install. You can do this by running `apt install llvm-toolchain-17`. The script should output any unmet requirements and terminate (relatively) gracefully.
