@@ -84,10 +84,10 @@ Finally, the `branch_dictionary.txt` must also be opened in append mode to suppo
 #### 4.1.1 Improvements
 Many of these issues could likely be improved or altogether removed through more knowledgable and judiciuos usage of LLVM; unfortunately, there was not time to implement this. Here we outline why these decisions were made and some of the potential improvements.
 
-##### Support functions
+##### 4.1.1.1 Support functions
 As mentioned the support functions require users to include another C source file in their compilation and can potentially result in name collisions. If we were to insert the instructions to open, write, and close the file directly in the LLVM IR this would eliminate the need for the support functions. The reason this was not done is because it requires figuring out how to represent a `FILE *` in the function declarations. This may be a simple matter for someone more familiar with LLVM, but time did not permit for the necessary experimentation.
 
-##### Run collisions
+##### 4.1.1.2 Run collisions
 A number of files can cause collisions between runs if users are not judicious about cleanup and isolating executions. This is due to the inability to pass information between passes in LLVM. There are two possible solutions to this. 
 
 First would be to figure out some way to provide a qualifier to the compilation. If we could do this, then all the generated files, including the insertions to open and close `branch_trace.txt` could be qualified with the input and so long as a user did not pass the same qualifier into multiple runs, no collisions would occur either between subsequent or concurrent runs.
@@ -95,6 +95,48 @@ First would be to figure out some way to provide a qualifier to the compilation.
 Second is to move the pass to a different location. From a brief discussion with Dr. Shen, it seems that LLVM includes the ability to write link-time passes that can extend between modules. This would allow retaining information between the modules. However, this would also likely require a total rewrite of the pass and the infrastructure for the pass, which proved infeasible.
 
 Given the issues with this, we opted to include the `instrument.sh` script which uses a working directory to skirt these issues. It is not ideal, but it should prove helpful for simpler situations.
+
+##### 4.1.1.3 Unsupported constructs
+Currently, there appears to be some bugs surrounding logical combination operators (`&&` and `||`) in while loops and return statements. For example:
+```
+while (n+word_length < length && line[n+word_length] != ' ')
+  ++word_length;
+```
+
+LLVM represents this as the typical while loop construct of conditional and unconditional branch instructions. But additionally, it represents the `&&` operator's short-circuting behavior as an additional set of conditional branch instructions. You can think of it like this:
+```
+while(
+    if(n+word_length < length == false) {
+        yeild false
+    } else {
+        yield line[n+word_length] != ' '
+    }
+) {
+    ++word_length;
+}
+```
+
+When inspecting the LLVM IR, the code appears to be correctly instrumented, inserting branch logs into the if and else branches in addition to the normal while constructs. However, when the compiler moves on to machine code generation, it fails due to a segfault. I was not able to track down the root cause for this. The LLVM error report was not particularly helpful, likely due to my installation not being built with debug symbols enabled. I spoke with Dr. Shen and he said that it was okay to modify the code to avoid this construction. As such, the above example was modified to the logically equivalent:
+```
+while (1) {
+  if (n+word_length >= length) {
+    break;
+  }
+  if (line[n+word_length] == ' ') {
+    break;
+  }
+  ++word_length;
+}
+```
+
+Oddly, this doesn't seem to happen in if statements. I can't say whether it occurs in for loops or switch statements.
+
+##### 4.1.1.4 Slow execution
+Depending on the number of branches and how often they are hit, the instrumented programs can take orders of magnitude longer to execute than their uninstrumented versions. This is likely due to the extra writes and specifically the decision to have the log functions open and close the file every time they log a branch execution. Some slowdown is inescapable due to the extra work the instrumented code must do, but the major bottleneck of the file operations can likely be improved. Since the support functions open and close the file, every single branch log must perform the necessary syscalls to get access to the file and flush the write buffer which means they do not gain any benefit of typical buffered I/O performance improvements. A couple different approaches, discussed next, could be taken to mitigate this issue. 
+
+The first would be to open the file at the start of the main method and then close it just before the main function returns. However, this drastically increases the complexity of the plugin as it must also check for the main function, find all possible exit points, and properly add the close file instruction to all of them. The complexity of this risks either attempting to close an already closed file or not properly closing the file, both of which may result in breaking the instrumented program or unexpected other unexpected outcomes.
+
+The second would be to keep an internal buffer, likely an array, of tags that were hit, and then upon program termination, printing all of them to the file. This has the similar issue of complexity and finding all the exit points of the program. The risks are slightly different though. First, this would increase the memory footprint of the program by needing to store all the branch IDs. Second, the support functions would need to implement the appropriate array allocation and growth behaviors, leaving more possible room for errors. Third, incorrect instrumentation of the exit points could result in the branch trace not being printed at all or even being printed multiple times in full.
 
 ### 4.2 Instruction Count
 This section was significantly easier. All that is necessary is running the program with Valgrind's callgrind tool. This tool generates an output file that includes the total number of instructions along with a significant amount of data. From this point, all that is necessary to get the total count is to grep the file. This is essentially all the `countinstrs.sh` script does.
@@ -135,8 +177,12 @@ The below files have not yet been verified.
 ### Realworld
 The `realworld` directory contains a couple source files that are taken from real-world programs. 
 
-The `fmt` subdirectory contains a modified version of Apple's `fmt` command source code. The original can be found here: https://opensource.apple.com/source/text_cmds/text_cmds-106/fmt/fmt.c.auto.html. Modifications were made to ensure that it could successfully build on the VCL Ubuntu machines as well as to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen.
+#### fmt
+The `fmt` subdirectory contains a modified version of Apple's `fmt` command source code. The original can be found here: https://opensource.apple.com/source/text_cmds/text_cmds-106/fmt/fmt.c.auto.html. Modifications were made to ensure that it could successfully build on the VCL Ubuntu machines as well as to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen. The primary change was to address logical combination operations in while loops and return statements. See section [section 4.1.1.3](#4113-unsupported-constructs) for more information on why this change was necessary.
 
+The `fmt.c` file has been tested and will successfully compile when compiled with the plugin with the plugin. The generated executable has also been tested and behaves equivalently. However, I highly recommend using a small file to test it; the instrumented version is painfully slow. See [section 4.1.1.4](#4114-slow-execution) for some discussion on this.
+
+#### mongoose
 The `mongoose` subdirectory contains an older, and also modified, version of the Mongoose C web server library. Further details on the project and the most recent version of the library can be found here: https://github.com/cesanta/mongoose. Modifications were made to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen.
 
-These have not yet been tested to ensure that they work with the compiler plugin.
+The mongoose scenarios have not been tested yet, and as such may not successfully compile or run.

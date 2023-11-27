@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 EXECUTABLE_NAME="test-exe"
 
 PLUGIN_LOCATION=$1
@@ -20,6 +18,11 @@ for f in ${INPUT_FILES[@]}; do
 done
 
 clang-15 -gdwarf-4 -O0 -fpass-plugin="../$PLUGIN_LOCATION" ${ALTERED_PATH_FILES[@]}
+exit_code=$?
+if [[ "$exit_code" != 0 ]]; then
+    echo "Compilation failed: $exit_code"
+    exit 1
+fi
 
 cd ..
 
