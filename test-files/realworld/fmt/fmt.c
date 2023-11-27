@@ -173,8 +173,6 @@ static const char copyright[] =
   "Copyright (c) 1997 Gareth McCaughan. All rights reserved.\n";
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/usr.bin/fmt/fmt.c,v 1.22 2004/08/02 11:10:20 tjr Exp $");
-
 #include <err.h>
 #include <locale.h>
 #include <stdio.h>
@@ -458,11 +456,25 @@ process_stream(FILE *stream, const char *name) {
       while (n<length) {
         /* Find word end and count spaces after it */
         size_t word_length=0, space_length=0;
-        while (n+word_length < length && line[n+word_length] != ' ')
+        while (1) {
+          if (n+word_length >= length) {
+            break;
+          }
+          if (line[n+word_length] == ' ') {
+            break;
+          }
           ++word_length;
+        }
         space_length = word_length;
-        while (n+space_length < length && line[n+space_length] == ' ')
+        while (1) {
+          if (n+space_length >= length) {
+            break;
+          }
+          if (line[n+space_length] != ' ') {
+            break;
+          }
           ++space_length;
+        }
         /* Send the word to the output machinery. */
         output_word(first_indent, last_indent,
                     line+n, word_length, space_length-word_length);
@@ -480,7 +492,15 @@ process_stream(FILE *stream, const char *name) {
 static size_t
 indent_length(const wchar_t *line, size_t length) {
   size_t n=0;
-  while (n<length && *line++ == ' ') ++n;
+  while (1) {
+    if (n >= length) {
+        break;
+    }
+    if (*line++ != ' ') {
+        break;
+    }
+    ++n;
+  }
   return n;
 }
 
@@ -493,8 +513,23 @@ indent_length(const wchar_t *line, size_t length) {
 static int
 might_be_header(const wchar_t *line) {
   if (!iswupper(*line++)) return 0;
-  while (*line && (iswalnum(*line) || *line=='-')) ++line;
-  return (*line==':' && iswspace(line[1]));
+  while (1) {
+    if (!(*line)) {
+      break;
+    }
+    if (!iswalnum(*line)) {
+      if (*line!='-') {
+        break;
+      }
+    }
+    ++line;
+  }
+  if (*line==':') {
+    if (iswspace(line[1])) {
+        return 1;
+    }
+  }
+  return 0;
 }
 
 /* Begin a new paragraph with an indent of |indent| spaces.
@@ -605,7 +640,16 @@ center_stream(FILE *stream, const char *name) {
   int cwidth;
   while ((line=get_line(stream, &length)) != 0) {
     size_t l=length;
-    while (l>0 && iswspace(*line)) { ++line; --l; }
+    while (1) { 
+      if (l<=0) {
+        break;
+      }
+      if (!iswspace(*line)) {
+        break;
+      }
+      ++line; 
+      --l; 
+    }
     length=l;
     for (p = line, width = 0; p < &line[length]; p++)
       width += (cwidth = wcwidth(*p)) > 0 ? cwidth : 1;
@@ -639,7 +683,13 @@ get_line(FILE *stream, size_t *lengthp) {
   int cwidth;
 
   if (buf==NULL) { length=100; buf=XMALLOC(length * sizeof(wchar_t)); }
-  while ((ch=getwc(stream)) != '\n' && ch != WEOF) {
+  while (1) {
+    if ((ch=getwc(stream)) == '\n') {
+        break;
+    }
+    if (ch == WEOF) {
+        break;
+    }
     if (len+spaces_pending==0 && ch=='.' && !format_troff) troff=1;
     if (ch==' ') ++spaces_pending;
     else if (troff || iswprint(ch)) {
