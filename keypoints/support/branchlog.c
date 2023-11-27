@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void csc512project_log_branch(char* br_tag) {
+void csc512project_log_branch(int br_tag) {
     FILE *f = fopen("branch_trace.txt", "a");
-    fprintf(f, "%s\n", br_tag);
+    fprintf(f, "br_%d\n", br_tag);
     fclose(f);
 }
 

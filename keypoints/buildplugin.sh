@@ -2,7 +2,7 @@
 
 set -e
 
-requirements=(cmake clang-17 lldb-17 lld-17 clangd-17)
+requirements=(cmake clang-15 lldb-15 lld-15 clangd-15)
 unmet=""
 for r in ${requirements[@]}; do
     if [[ -z "$(which "$r")" ]]; then
@@ -15,7 +15,7 @@ if [[ -n "$unmet" ]]; then
     exit 1
 fi
 
-llvm_dir=${LLVM_DIR:-"/usr/lib/llvm-17"}
+llvm_dir=${LLVM_DIR:-"/usr/lib/llvm-15"}
 if [[ ! -d "$llvm_dir" ]]; then
     echo "Unable to locate LLVM directory. 
 If you did not set it, please include it by rerunning the command with LLVM_DIR set.

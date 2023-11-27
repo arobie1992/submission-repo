@@ -7,3 +7,4 @@ keypoints/build
 **/a.out*
 **/tmp-*/
 **/counter.log
+test-runs/

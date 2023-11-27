@@ -59,13 +59,11 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
     void addFilePrint(Module &M, Instruction &I, BranchEntry &BE) {
         // info on linking to externally defined library from: https://www.cs.cornell.edu/~asampson/blog/llvm.html
         LLVMContext &context = M.getContext();
-        Type *stringtype(Type::getInt8PtrTy(context));
         // hopefully this name is unique enough to not cause collisions
-        auto logFunc = M.getOrInsertFunction("csc512project_log_branch", Type::getVoidTy(context), stringtype);
+        auto logFunc = M.getOrInsertFunction("csc512project_log_branch", Type::getVoidTy(context), Type::getInt32Ty(context));
         IRBuilder<> builder(&I);
-        Value *str = builder.CreateGlobalStringPtr("br_" + std::to_string(BE.id), "str");
-        Value *arg(str);
-        builder.CreateCall(logFunc, arg, "brtag");
+        Value *arg(builder.getInt32(BE.id));
+        builder.CreateCall(logFunc, arg, "brtag" + std::to_string(BE.id));
     };
     void addBranchTag(Module &M, int condition_line, BasicBlock &BB) {
         if(!seen.insert(&BB).second) {
@@ -167,7 +165,7 @@ struct KeyPointsPass : public PassInfoMixin<KeyPointsPass> {
         }
         writeBranchDictionary(branchEntries);
         recordCounter(counter);
-        return PreservedAnalyses::all();
+        return PreservedAnalyses::none();
     };
 };
 
