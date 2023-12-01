@@ -97,7 +97,7 @@ Second is to move the pass to a different location. From a brief discussion with
 Given the issues with this, we opted to include the `instrument.sh` script which uses a working directory to skirt these issues. It is not ideal, but it should prove helpful for simpler situations.
 
 ##### 4.1.1.3 Unsupported constructs
-Currently, there appears to be some bugs surrounding logical combination operators (`&&` and `||`) in while loops and return statements. For example:
+Currently, there appears to be some bugs surrounding logical combination operators (`&&` and `||`) in while and for loop conditions and return statements. For example:
 ```
 while (n+word_length < length && line[n+word_length] != ' ')
   ++word_length;
@@ -129,7 +129,7 @@ while (1) {
 }
 ```
 
-Oddly, this doesn't seem to happen in if statements. I can't say whether it occurs in for loops or switch statements.
+A similar issue seems to arise with combination operators in assignments, `int x = a || b`. Oddly, this doesn't seem to happen in if statements, just loop condition checks. I can't say whether it occurs in switch statements.
 
 ##### 4.1.1.4 Slow execution
 Depending on the number of branches and how often they are hit, the instrumented programs can take orders of magnitude longer to execute than their uninstrumented versions. This is likely due to the extra writes and specifically the decision to have the log functions open and close the file every time they log a branch execution. Some slowdown is inescapable due to the extra work the instrumented code must do, but the major bottleneck of the file operations can likely be improved. Since the support functions open and close the file, every single branch log must perform the necessary syscalls to get access to the file and flush the write buffer which means they do not gain any benefit of typical buffered I/O performance improvements. A couple different approaches, discussed next, could be taken to mitigate this issue. 
