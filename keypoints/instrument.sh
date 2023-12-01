@@ -20,7 +20,7 @@ done
 clang-15 -gdwarf-4 -O0 -fpass-plugin="../$PLUGIN_LOCATION" ${ALTERED_PATH_FILES[@]}
 exit_code=$?
 if [[ "$exit_code" != 0 ]]; then
-    echo "Compilation failed: $exit_code"
+    echo "Compilation failed with exit code: $exit_code"
     exit 1
 fi
 
