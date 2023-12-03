@@ -150,7 +150,7 @@ This section was significantly easier. All that is necessary is running the prog
 #### 4.2.1 Improvements
 The improvements to the instruction count are far less extensive as the tool was much simpler and had fewer areas for tricky configuration.
 
-##### Run collisions
+##### 4.2.1.1 Run collisions
 While the instruction counting portion of part 1 is not as susceptible to run collisions as the instrumentation portion, it still does run into some risks with the Callgrind report file and the file to which all the output is logged. These could be addressed by adding the pid as qualifier to the file names as defined in the shell script. This would serve a similar purpose to how the instrument.sh script makes use of the temp working directory and how Callgrind generates the default report file name—in fact, this is where we drew the idea for the temp directory from. The reason we could not use the default name generation was because it made it difficult to discover the report file. However, if we were to qualify the file name in countinstrs.sh, it would make it unique while also allowing us to easily discover it. The only reason this is not implemented is due to time constraints and responsibilities with other classes.
 
 ## Test Cases
