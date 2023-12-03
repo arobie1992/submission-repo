@@ -138,11 +138,20 @@ The first would be to open the file at the start of the main method and then clo
 
 The second would be to keep an internal buffer, likely an array, of tags that were hit, and then upon program termination, printing all of them to the file. This has the similar issue of complexity and finding all the exit points of the program. The risks are slightly different though. First, this would increase the memory footprint of the program by needing to store all the branch IDs. Second, the support functions would need to implement the appropriate array allocation and growth behaviors, leaving more possible room for errors. Third, incorrect instrumentation of the exit points could result in the branch trace not being printed at all or even being printed multiple times in full.
 
+##### 4.1.1.5 Module name in instrument.sh
+LLVM uses the fully qualified file name of the input C files as the module. This includes things like relative path. Because the instrument.sh script creates a working directory, it must update the file paths slightly to include ../ prefixed to all the file names. This results in the branch dictionary having slightly different names than the files passed in. While this is not major, it is an area for improvement. This could be done by having some flag to the plugin to tell it to trim these prefixes.
+
+##### 4.1.1.6 Handling file failures
+Writing the branch trace requires opening and closing the file. These operations can fail, but at the moment the plugin does not account for this situation. It does this so as to not add additional branches that may erroneously be picked up when running the passes. This however, is not ideal, and could be addressed by having the pass detect what is an inserted branch versus what is a branch from the source code. One way to do this would be checking the module name. There may be some other ways to do this, such as ones provided through LLVM, but we were not able to find a means to do so within the timeline of the project.
+
 ### 4.2 Instruction Count
 This section was significantly easier. All that is necessary is running the program with Valgrind's callgrind tool. This tool generates an output file that includes the total number of instructions along with a significant amount of data. From this point, all that is necessary to get the total count is to grep the file. This is essentially all the `countinstrs.sh` script does.
 
 #### 4.2.1 Improvements
-There are likely improvements that could be made to this section as well, such as added flexibility in output formatting or where to display the output, but given the scope of the project, most of these are rather inconsequential.
+The improvements to the instruction count are far less extensive as the tool was much simpler and had fewer areas for tricky configuration.
+
+##### Run collisions
+While the instruction counting portion of part 1 is not as susceptible to run collisions as the instrumentation portion, it still does run into some risks with the Callgrind report file and the file to which all the output is logged. These could be addressed by adding the pid as qualifier to the file names as defined in the shell script. This would serve a similar purpose to how the instrument.sh script makes use of the temp working directory and how Callgrind generates the default report file name—in fact, this is where we drew the idea for the temp directory from. The reason we could not use the default name generation was because it made it difficult to discover the report file. However, if we were to qualify the file name in countinstrs.sh, it would make it unique while also allowing us to easily discover it. The only reason this is not implemented is due to time constraints and responsibilities with other classes.
 
 ## Test Cases
 A number of test cases are provided in the `test-files` directory. They are split into a few subdirectories.
