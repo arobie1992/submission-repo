@@ -35,6 +35,8 @@ For example, if you wish to compile a file called `foo.c`, generate an executabl
 clang-15 -gdwarf-4 -fpass-plugin="KeyPointsPass.so" branchlog.c foo.c -o foo
 ```
 
+The `-gdwarf-4` flag is necessary to get debug information to retrieve information such as line numbers of the conditions and alternatives. You may try using the `-g` flag, but there is a chance this will fail. During testing, I ran into an issue with architecture compatibility and had to use the `-gdwarf-4` flag instead. Since then any tests have exclusively used the `-gdwarf-4` flag which has worked.
+
 You will end up with a `branch_dictionary.txt` file and your `foo` executable. There will also be a `counter.log` file that is simply an artifact of the compilation. At this point, you can run `foo` as you would any typical executable. The `branch_dictionary.txt` will contain the branch tags, their source file, line number, and the line number of each alternative. It may be best to use the `-O0` compiler flag to disable optimizations. Allowing optimization should not negatively affect the behavior of the plugin, but may result in branches being reorganized or eliminated.
 
 You can also use the `keypoints/instrument.sh` script to generate your executable and avoid some of the potential cleanup listed here. To do this, pass the location of the plugin as the first argument and then all the source files, including the `branchlog.c` file. For example, if you have the plugin in a `plugins/` directory and your source file `foo.c` and `branchlog.c` in a `src/` directory, you would run the script like so:
@@ -184,14 +186,9 @@ The below files have not yet been verified.
 - N/A
 
 ### Realworld
-The `realworld` directory contains a couple source files that are taken from real-world programs. 
+The `realworld` directory contains a source file from a real-world program. Details are provided below.
 
 #### fmt
 The `fmt` subdirectory contains a modified version of Apple's `fmt` command source code. The original can be found here: https://opensource.apple.com/source/text_cmds/text_cmds-106/fmt/fmt.c.auto.html. Modifications were made to ensure that it could successfully build on the VCL Ubuntu machines as well as to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen. The primary change was to address logical combination operations in while loops and return statements. See section [section 4.1.1.3](#4113-unsupported-constructs) for more information on why this change was necessary.
 
 The `fmt.c` file has been tested and will successfully compile when compiled with the plugin with the plugin. The generated executable has also been tested and behaves equivalently. However, I highly recommend using a small file to test it; the instrumented version is painfully slow. See [section 4.1.1.4](#4114-slow-execution) for some discussion on this.
-
-#### mongoose
-The `mongoose` subdirectory contains an older, and also modified, version of the Mongoose C web server library. Further details on the project and the most recent version of the library can be found here: https://github.com/cesanta/mongoose. Modifications were made to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen.
-
-The mongoose scenarios have not been tested yet, and as such may not successfully compile or run.
