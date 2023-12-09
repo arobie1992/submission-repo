@@ -73,7 +73,7 @@ You will also see a `callgrind-results.txt.{pid}` file where `{pid}` is the pid 
 ## 4 Implementation
 
 ### 4.1 Key Points
-The key points pass is implemented as an LLVM pass that inspects the LLVM IR for branch, switch, and call instructions. When it finds a branch or switch instruction, it inserts a new instruction to call to a support function, `csc512project_log_branch` that accepts a string argument of the branch tag. This support function opens a file called `branch_trace.txt` for append, writes the branch tag to it, and closes the file. The pass also adds a record of the branch and the alternatives to the `branch_dictionary.txt`.
+The key points pass is implemented as an LLVM pass that inspects the LLVM IR for branch, switch, and call instructions. When it finds a branch or switch instruction, it inserts a new instruction to call to a support function, `csc512project_log_branch` that accepts an integer argument of the branch ID. This support function opens a file called `branch_trace.txt` for append, writes a branch tag with the ID to it, and closes the file. The pass also adds a record of the branch and the alternatives to the `branch_dictionary.txt`.
 
 When it encounters a call instruction, it checks to see if the instruction is a direct call or an indirect call. If it is a direct call, it skips it. If it is indirect, this means that the call is to a function pointer. The pass inserts a new instruction to call another support function, `csc512project_log_fp`. This accepts a void pointer that is the function pointer. It opens the same `branch_trace.txt` file, writes the address of the function pointer, and then closes the file.
 
@@ -131,12 +131,12 @@ while (1) {
 }
 ```
 
-A similar issue seems to arise with combination operators in assignments, `int x = a || b`. Oddly, this doesn't seem to happen in if statements, just loop condition checks. I can't say whether it occurs in switch statements.
+A similar issue seems to arise with combination operators in assignments, `int x = a || b`. Oddly, this doesn't seem to happen in if statements. I can't say whether it occurs in switch statements.
 
 ##### 4.1.1.4 Slow execution
 Depending on the number of branches and how often they are hit, the instrumented programs can take orders of magnitude longer to execute than their uninstrumented versions. This is likely due to the extra writes and specifically the decision to have the log functions open and close the file every time they log a branch execution. Some slowdown is inescapable due to the extra work the instrumented code must do, but the major bottleneck of the file operations can likely be improved. Since the support functions open and close the file, every single branch log must perform the necessary syscalls to get access to the file and flush the write buffer which means they do not gain any benefit of typical buffered I/O performance improvements. A couple different approaches, discussed next, could be taken to mitigate this issue. 
 
-The first would be to open the file at the start of the main method and then close it just before the main function returns. However, this drastically increases the complexity of the plugin as it must also check for the main function, find all possible exit points, and properly add the close file instruction to all of them. The complexity of this risks either attempting to close an already closed file or not properly closing the file, both of which may result in breaking the instrumented program or unexpected other unexpected outcomes.
+The first would be to open the file at the start of the main method and then close it just before the main function returns. However, this drastically increases the complexity of the plugin as it must also check for the main function, find all possible exit points, and properly add the close file instruction to all of them. The complexity of this risks either attempting to close an already closed file or not properly closing the file, both of which may result in breaking the instrumented program or other unexpected outcomes.
 
 The second would be to keep an internal buffer, likely an array, of tags that were hit, and then upon program termination, printing all of them to the file. This has the similar issue of complexity and finding all the exit points of the program. The risks are slightly different though. First, this would increase the memory footprint of the program by needing to store all the branch IDs. Second, the support functions would need to implement the appropriate array allocation and growth behaviors, leaving more possible room for errors. Third, incorrect instrumentation of the exit points could result in the branch trace not being printed at all or even being printed multiple times in full.
 
@@ -155,13 +155,15 @@ The improvements to the instruction count are far less extensive as the tool was
 ##### 4.2.1.1 Run collisions
 While the instruction counting portion of part 1 is not as susceptible to run collisions as the instrumentation portion, it still does run into some risks with the Callgrind report file and the file to which all the output is logged. These could be addressed by adding the pid as qualifier to the file names as defined in the shell script. This would serve a similar purpose to how the instrument.sh script makes use of the temp working directory and how Callgrind generates the default report file name—in fact, this is where we drew the idea for the temp directory from. The reason we could not use the default name generation was because it made it difficult to discover the report file. However, if we were to qualify the file name in `countinstrs.sh`, it would make it unique while also allowing us to easily discover it. The only reason this is not implemented is due to time constraints and responsibilities with other classes.
 
-## Test Cases
+## 5 Test Cases
 A number of test cases are provided in the `test-files` directory. They are split into a few subdirectories.
 
-### Simple
+### 5.1 Simple
 In the `simple` directory, there are a number of files. The vast majority of these are stand-alone and are intended to test the plugin behavior in isolation. Their names should give an idea of what C behavior they represent. 
 
 The one exception to this is the three files `externalcall.c`, `externalfunc.c`, and `externalfunc.h`. These test the ability of the plugin to support programs split across multiple files and must be compiled together. As with typical C programs, you need only pass the two `.c` files to the compiler; the `.h` file is simply so the `externalcall.c` file can know about the function declaration.
+
+The `funcpointer.c` file will result in an empty `branch_dictionary.txt`, but will still result in a branch trace. This is expected as there are no branches in the code to be written to the dictionary, but it still involves a call to a function pointer, which writes its value to `branch_trace.txt`.
 
 Also note that `goto.c` will not generate a `branch_trace.txt`. This is expected as it does not contain any conditional branches, so no instrumentation was added and no file is opened or written while it runs. It will still generate an empty `branch_dictionary.txt`.
 
@@ -185,10 +187,10 @@ The below files have not yet been verified.
 
 - N/A
 
-### Realworld
+### 5.2 Realworld
 The `realworld` directory contains a source file from a real-world program. Details are provided below.
 
-#### fmt
+#### 5.2.1 fmt
 The `fmt` subdirectory contains a modified version of Apple's `fmt` command source code. The original can be found here: https://opensource.apple.com/source/text_cmds/text_cmds-106/fmt/fmt.c.auto.html. Modifications were made to ensure that it could successfully build on the VCL Ubuntu machines as well as to address a couple points the plugin could not handle within the bounds permitted by Dr. Shen. The primary change was to address logical combination operations in while loops and return statements. See section [section 4.1.1.3](#4113-unsupported-constructs) for more information on why this change was necessary.
 
 The `fmt.c` file has been tested and will successfully compile when compiled with the plugin with the plugin. The generated executable has also been tested and behaves equivalently. However, I highly recommend using a small file to test it; the instrumented version is painfully slow. See [section 4.1.1.4](#4114-slow-execution) for some discussion on this.
